@@ -269,6 +269,8 @@ export function convertWGS84ToEPSG3857(lng: number, lat: number): [number, numbe
   return [x, y];
 }
 
+// 기존의 fetchEleBuildings 함수를 찾아서 아래 코드로 완전히 교체하세요.
+
 export async function fetchEleBuildings(bounds: { xmin: number; ymin: number; xmax: number; ymax: number }, signal?: AbortSignal): Promise<EleBuildingFeature[]> {
   const p3857_min = convertWGS84ToEPSG3857(bounds.xmin, bounds.ymin);
   const p3857_max = convertWGS84ToEPSG3857(bounds.xmax, bounds.ymax);
@@ -276,8 +278,13 @@ export async function fetchEleBuildings(bounds: { xmin: number; ymin: number; xm
   const bboxParam = `${p3857_min[0]},${p3857_min[1]},${p3857_max[0]},${p3857_max[1]}%2CEPSG%3A3857`;
   const viewparamsParam = `xmin:${bounds.xmin};ymin:${bounds.ymin};xmax:${bounds.xmax};ymax:${bounds.ymax}`;
   
-  // CORS 차단을 방어하기 위해 Vite Proxy용 상대 경로 설계 마감
-  const url = `/geoserver/koelsa/ows?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&OUTPUTFORMAT=application%2Fjson&TYPENAME=koelsadp%3Abuilding_q&bbox=${bboxParam}&VIEWPARAMS=${viewparamsParam}`;
+  // 🎯 [CORS 해결] 
+  // 1. 공단 서버로 가는 원본 URL을 생성합니다.
+  const targetUrl = `https://eledata.koelsa.or.kr/geoserver/koelsa/ows?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&OUTPUTFORMAT=application%2Fjson&TYPENAME=koelsadp%3Abuilding_q&bbox=${bboxParam}&VIEWPARAMS=${viewparamsParam}`;
+  
+  // 2. CORS Proxy 서비스 주소를 앞에 붙여서 요청을 보냅니다.
+  const proxyUrl = "https://corsproxy.io/?";
+  const url = `${proxyUrl}${encodeURIComponent(targetUrl)}`;
   
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

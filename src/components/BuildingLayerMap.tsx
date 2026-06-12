@@ -284,7 +284,7 @@ export default function BuildingLayerMap({ onBuildingSelect, onLoadingStateChang
                     previewOverlaysRef.current.push(previewOverlay);
                   }
                 } else {
-                  alert('공공데이터 포털에 등록된 상세 승강기 정보가 존재하지 않습니다.');
+                  alert('등록된 승강기 정보가 존재하지 않습니다.');
                 }
               } catch (err) {
                 console.error(err);
@@ -297,7 +297,7 @@ export default function BuildingLayerMap({ onBuildingSelect, onLoadingStateChang
             customMarkersRef.current.push(customMarkerOverlay);
           });
         } catch (err: any) {
-          if (err.name !== 'AbortError') console.error('[건물 레이어] 스캔 실패:', err);
+          if (err.name !== 'AbortError') console.error('스캔 실패:', err);
         } finally {
           setScanning(false);
         }

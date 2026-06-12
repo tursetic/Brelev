@@ -269,25 +269,34 @@ export function convertWGS84ToEPSG3857(lng: number, lat: number): [number, numbe
   return [x, y];
 }
 
-// 기존의 fetchEleBuildings 함수를 찾아서 아래 코드로 완전히 교체하세요.
-
-export async function fetchEleBuildings(bounds: { xmin: number; ymin: number; xmax: number; ymax: number }, signal?: AbortSignal): Promise<EleBuildingFeature[]> {
+export async function fetchEleBuildings(bounds: { xmin: number; ymin: number; xmax: number; ymax: number; }, signal?: AbortSignal) {
   const p3857_min = convertWGS84ToEPSG3857(bounds.xmin, bounds.ymin);
   const p3857_max = convertWGS84ToEPSG3857(bounds.xmax, bounds.ymax);
-  
-  const bboxParam = `${p3857_min[0]},${p3857_min[1]},${p3857_max[0]},${p3857_max[1]}%2CEPSG%3A3857`;
+
+  const bboxParam = `${p3857_min[0]},${p3857_min[1]},${p3857_max[0]},${p3857_max[1]}`;
   const viewparamsParam = `xmin:${bounds.xmin};ymin:${bounds.ymin};xmax:${bounds.xmax};ymax:${bounds.ymax}`;
-  
-  // 🎯 [CORS 해결] 
-  // 1. 공단 서버로 가는 원본 URL을 생성합니다.
-  const targetUrl = `https://eledata.koelsa.or.kr/geoserver/koelsa/ows?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&OUTPUTFORMAT=application%2Fjson&TYPENAME=koelsadp%3Abuilding_q&bbox=${bboxParam}&VIEWPARAMS=${viewparamsParam}`;
-  
-  // 2. CORS Proxy 서비스 주소를 앞에 붙여서 요청을 보냅니다.
-  const proxyUrl = "https://corsproxy.io/?";
-  const url = `${proxyUrl}${encodeURIComponent(targetUrl)}`;
-  
+
+  // 🎯 [CORS 해결 - Cloudflare Functions 활용]
+  // 외부 중계 주소 없이, 내 도메인의 /api/proxy 라우트로 요청을 던집니다.
+  // 실제 백엔드 주소 뒤에 붙던 파라미터들은 템플릿 리터럴로 쿼리 스트링 째로 넘겨줍니다.
+  const baseUrl = "/api/proxy";
+  const params = new URLSearchParams({
+    SERVICE: 'WFS',
+    VERSION: '1.1.0',
+    REQUEST: 'GetFeature',
+    TYPENAME: 'koelsa:building',
+    MAXFEATURES: '100',
+    OUTPUTFORMAT: 'application/json',
+    SRSNAME: 'EPSG:3857',
+    BBOX: bboxParam,
+    VIEWPARAMS: viewparamsParam
+  });
+
+  const url = `${baseUrl}?${params.toString()}`;
+
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  
   const data = await res.json();
   return data.features || [];
 }

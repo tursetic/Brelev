@@ -290,8 +290,9 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
 
         <div className="overflow-y-auto flex-1 px-3 py-1 pb-3 space-y-1.5">
 
+          {/* 🎯 [완치 1] 수시검사 알림 박스 다크 모드 고대비 테두리 가드 바인딩 (dark:border-red-900/50) */}
           {recentEmergencyInspect && (
-            <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 rounded-xl px-2.5 py-1 flex items-center gap-2 text-[11px] font-bold text-red-700 dark:text-red-400 shadow-none">
+            <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/50 rounded-xl px-2.5 py-1 flex items-center gap-2 text-[11px] font-bold text-red-700 dark:text-red-400 shadow-none">
               <AlertTriangle size={11} className="shrink-0" />
               <span>수시검사 이력이 있습니다. ({formatDate(recentEmergencyInspect.inspctDt)})</span>
             </div>
@@ -315,7 +316,6 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
               )}
             </div>
             {s.buldPrpos && el.buldPrpos && (
-              // [초밀착] text-[10.5px] -> text-[9px] 축소, leading-none 및 pb-0.5 마감으로 간격 최소화
               <span className="block pl-5 text-slate-400/80 dark:text-gray-500/70 text-[9px] font-normal leading-none pb-0.5">{el.buldPrpos}</span>
             )}
           </div>
@@ -337,7 +337,6 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
               <div className="flex flex-col gap-0 leading-none">
                 {hasReplacement ? (
                   <>
-                    {/* [초밀착] mt-0.5 제거 및 leading-tight 제어로 두 줄을 타이포그래피 한계까지 밀착 */}
                     <span className="font-semibold text-slate-600 dark:text-gray-400 text-[11px] leading-tight">교체 {formatDate(el.installationDe)}</span>
                     <span className="text-slate-400 dark:text-gray-500 text-[9.5px] font-medium leading-tight">최초설치 {formatDate(el.frstInstallationDe)}</span>
                   </>
@@ -346,7 +345,6 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
                 ) : null}
               </div>
               
-              {/* 요구사항 1-2) 우하단 승강기 종류 배지의 과도한 파란색 강조를 날리고 단정한 무채색 외곽선으로 교정 */}
               {s.elvtrKindNm && el.elvtrKindNm && (
                 <span className="px-1.5 py-0.25 text-[10px] font-bold border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 rounded shrink-0 tracking-tight self-end">
                   {el.elvtrKindNm}
@@ -372,7 +370,6 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
               <GridCell label="설치일자" value={formatDate(el.installationDe)} show={s.installationDe} />
               
               <GridCell label="최종검사결과" value={el.lastResultNm} />
-              {/* 요구사항 2) 운행재개일/휴폐지일자 대시 기호 한 개 이상 조건문 필터 결합 구조로 완전 방어 */}
               {isValidVal(resmptDe) ? (
                 <GridCell label="운행 재개일" value={formatDate(resmptDe)} />
               ) : (
@@ -424,38 +421,38 @@ export default function ElevatorModal({ elevator: el, settings: s, onClose, onNa
                   const isPassed = record.psexamYn === '합격';
                   const isConditional = record.psexamYn && !isPassed && !isFailed;
 
-                  // 요구사항 3) 수시검사는 강하고 확실한 보라 보더 음영 복구, 정기검사가 아닌 일반 비정기 검사는 수시보단 연한 고급스러운 중명도 무채색 카드 기틀 장착 완료
-                  let cardBg = 'bg-white dark:bg-gray-800 border-slate-200/40 dark:border-gray-700';
+                  // 🎨 [완치 2] 검사 이력 카드 배경 및 테두리 다크 모드 최적화 (dark:border-red-900/50 등 반영)
+                  let cardBg = 'bg-white dark:bg-gray-800 border-slate-200/40 dark:border-gray-700/60';
                   if (isFailed) {
-                    cardBg = 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800';
+                    cardBg = 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/50';
                   } else if (isEmergency) {
-                    cardBg = 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800';
+                    cardBg = 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900/50';
                   } else if (!isRegular) {
-                    cardBg = 'bg-slate-100/70 dark:bg-slate-800/60 border-slate-200 dark:border-gray-700/60';
+                    cardBg = 'bg-slate-100/70 dark:bg-slate-800/60 border-slate-200/40 dark:border-gray-700/50';
                   }
 
                   const resultChip = isFailed
-                    ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
+                    ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/60'
                     : isConditional
-                    ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700';
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/60'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700/60';
 
                   return (
                     <div key={idx} className={`rounded-xl px-2.5 py-1.5 border text-xs flex flex-col gap-0.5 ${cardBg}`}>
+                      {/* 🎯 [완치 3] 배지 간의 수평 정렬 간격을 gap-1.5에서 gap-1로 좁혀 파편화 소멸 */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          {/* 요구사항 3) '정기검사' 및 '결과' 배지들의 가독성 스케일을 오리지널 10.5px로 시원하게 증폭 전개 */}
-                          <span className="px-1 py-0.5 rounded bg-slate-50 dark:bg-gray-700 text-slate-600 dark:text-gray-400 border text-[10.5px] font-bold shrink-0">{record.inspctKind || '-'}</span>
+                        <div className="flex items-center gap-1 min-w-0 flex-1">
+                          {/* 🎯 [완치 2] 검사 종류 배지의 다크모드 테두리 보더 투명 명도 교정 (dark:border-gray-600) */}
+                          <span className="px-1 py-0.5 rounded bg-slate-50 dark:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-600 text-[10.5px] font-bold shrink-0">{record.inspctKind || '-'}</span>
                           <span className={`px-1.5 py-0.5 rounded font-bold text-[10.5px] shrink-0 whitespace-nowrap ${resultChip}`}>{record.psexamYn}</span>
-                          
-                          {/* 지적 사항 교정) 글자 크기를 9.5px로 마이크로화하고 명도를 한 단계 더 낮춰 비중을 확실하게 백그라운드로 격하 안착 */}
-                          <p className="text-slate-400/70 dark:text-gray-500/70 text-[9.5px] font-normal truncate flex-1 min-w-0">{record.inspctInsttNm || '-'}</p>
+                          <p className="text-slate-400/70 dark:text-gray-500/70 text-[9.5px] font-normal truncate flex-1 min-w-0 ml-0.5">{record.inspctInsttNm || '-'}</p>
                         </div>
                         <span className="font-black shrink-0 text-[10.5px] text-slate-600 dark:text-gray-400 tracking-tight">{formatDate(record.inspctDt)}</span>
                       </div>
                       
+                      {/* 🎯 [완치 4] 줄 간격 마진 패딩 최소 밀착 오더 완치 (mt-0 및 leading-tight 제어 추가) */}
                       {(record.applcBeDt || record.applcEnDt) && (
-                        <p className="text-slate-400 dark:text-gray-500 pl-1 text-[10.5px] font-normal mt-0.5">
+                        <p className="text-slate-400 dark:text-gray-400 pl-1 text-[10.5px] font-normal mt-0 leading-tight">
                           유효기간 {formatDate(record.applcBeDt)} ~ {formatDate(record.applcEnDt)}
                         </p>
                       )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GeoGroup, ElevatorWithBadges } from '../types';
+import { GeoGroup, ElevatorWithBadges, SettingsFields } from '../types';
 import { ensureKakaoReady } from '../utils/api';
 import { formatDate, formatRatedSpeed, checkShuttleSection } from '../utils/elevatorHelpers';
 import { Maximize, Minimize } from 'lucide-react';
@@ -18,6 +18,7 @@ interface MapViewProps {
   onBookmarkChange?: () => void;
   onShowBookmarkPicker?: (elevator: ElevatorWithBadges) => void;
   focusAddress?: string;
+  settings?: SettingsFields;
 }
 
 export default function MapView({
@@ -33,6 +34,7 @@ export default function MapView({
   onBookmarkChange,
   onShowBookmarkPicker,
   focusAddress,
+  settings,
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -74,14 +76,12 @@ export default function MapView({
     }
   }, [visible, reopenOverlay]);
 
-  // Focus on specific address when focusAddress prop changes
   const focusAddressRef = useRef<string>('');
   const pendingFocusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!focusAddress) return;
 
-    // Store pending focus if map or geoGroups not ready
     const targetGroup = geoGroups.find(g => g.address === focusAddress);
     if (!targetGroup) {
       pendingFocusRef.current = focusAddress;
@@ -93,19 +93,15 @@ export default function MapView({
       return;
     }
 
-    // Skip if already processed this exact focus address successfully
     if (focusAddressRef.current === focusAddress) return;
 
-    // Mark as processed
     focusAddressRef.current = focusAddress;
     pendingFocusRef.current = null;
 
     const kakao = (window as any).kakao;
     const position = new kakao.maps.LatLng(targetGroup.lat, targetGroup.lng);
     mapInstanceRef.current.panTo(position);
-    // Close existing overlay and open the target one
     closeAllOverlays();
-    // Find and open the overlay for this group
     const overlayIndex = geoGroups.findIndex(g => g.address === focusAddress);
     if (overlayIndex !== -1 && overlaysRef.current[overlayIndex]) {
       overlaysRef.current[overlayIndex].setMap(mapInstanceRef.current);
@@ -114,7 +110,6 @@ export default function MapView({
     }
   }, [focusAddress, geoGroups, closeAllOverlays]);
 
-  // Process pending focus when map instance becomes available
   useEffect(() => {
     if (!mapInstanceRef.current || !pendingFocusRef.current) return;
 
@@ -219,8 +214,6 @@ export default function MapView({
           mapInstanceRef.current.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
           mapInstanceRef.current.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
           if (onMapReady) onMapReady();
-          // ★ 펜딩 포커스: overlay는 아직 생성되지 않았으므로 focusAddressRef만 설정
-          // 실제 overlay 열기는 shouldRedrawMarkers 루프 이후에 처리
         }
 
         if (isNewMap && !hasSetBoundsRef.current) {
@@ -327,7 +320,7 @@ export default function MapView({
                   <h4 class="text-[14px] font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1 truncate">
                     ${isMultiBuilding ? `🏢 복합 주소지 (건물 ${bldgEntries.length}곳)` : group.buildingName || '지정 건물'}
                   </h4>
-                  <p class="text-[10.5px] text-slate-400 dark:text-gray-500 mt-0.5 font-normal truncate">${cleanAddress}</p>
+                  <p class="text-[10.5px] text-slate-400 dark:text-gray-400 mt-0.5 font-normal truncate">${cleanAddress}</p>
                 </div>
               </div>
               <div class="max-h-[195px] overflow-y-auto space-y-1.5 pr-0.5" style="scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
@@ -375,19 +368,25 @@ export default function MapView({
                           if (manu.includes('현대엘')) modelColorClass = 'text-emerald-600 dark:text-emerald-400';
                           else if (manu.includes('오티스엘')) modelColorClass = 'text-indigo-600 dark:text-indigo-400';
                           else if (manu.includes('티케이엘')) modelColorClass = 'text-sky-500 dark:text-sky-400';
-                          else if (manu.includes('미쓰비시') || manu.includes('후지테크')) modelColorClass = 'text-red-500 dark:text-red-400';
+                          else if (manu.includes('미쓰비시') || primaryManu.includes('후지테크')) modelColorClass = 'text-red-500 dark:text-red-400';
 
+                          // 🎨 [다크모드 완치] 특이 운행 구간일 때 고채도 퍼플 배지 시인성 확보 및 일반 명도 복구
                           const shuttleBadgeClass = !shuttle.valid
-                            ? 'bg-purple-50/40 text-purple-500 dark:text-purple-400 border-purple-100 dark:border-purple-900/30 font-bold text-[9.5px]'
-                            : 'bg-slate-50 dark:bg-gray-700/50 text-slate-400 dark:text-gray-500 border-slate-200 dark:border-gray-600 font-normal text-[9.5px]';
+                            ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800/50 font-bold text-[9.5px]'
+                            : 'bg-slate-50 dark:bg-gray-700/50 text-slate-600 dark:text-gray-300 border-slate-200 dark:border-gray-600 font-normal text-[9.5px]';
 
+                          // 🎨 [다크모드 완치] 운행중/운행정지 배지 다크모드 반전 격리 색상 동기화
                           const statusBadgeClass = ev.elvtrStts === '운행중' 
-                            ? 'bg-emerald-50/60 text-emerald-600 dark:text-emerald-400 border-emerald-100/70 dark:border-emerald-900/30' 
-                            : 'bg-amber-50/60 text-amber-600 dark:text-amber-400 border-amber-100/70 dark:border-amber-900/30';
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50' 
+                            : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/50';
+
+                          const kindBadgeHtml = (!settings || settings.elvtrKindNm) && ev.elvtrKindNm
+                            ? `<span class="px-1 py-0 text-[9.5px] font-normal bg-slate-50/40 dark:bg-gray-700/40 border border-slate-200/40 dark:border-gray-600/30 text-slate-400 dark:text-gray-500 rounded shrink-0">${ev.elvtrKindNm}</span>`
+                            : '';
 
                           const hasReplacement = ev.frstInstallationDe && ev.installationDe && ev.frstInstallationDe !== ev.installationDe;
                           const dateDisplayHtml = hasReplacement
-                            ? `<span class="text-slate-700 dark:text-gray-300 font-black bg-slate-100/80 dark:bg-gray-700/40 px-1 py-0.25 rounded">교체 ${formatDate(ev.installationDe)}</span>`
+                            ? `<span class="text-slate-600 dark:text-gray-300 font-bold bg-slate-100/80 dark:bg-gray-700/60 px-1 py-0.25 rounded">교체 ${formatDate(ev.installationDe)}</span>`
                             : ev.installationDe ? `<span>설치 ${formatDate(ev.installationDe)}</span>` : '';
 
                           const topGroundHtml = isTopGround ? `<span class="bg-slate-50 dark:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200/60 text-[8.5px] font-bold rounded px-1 py-0 shrink-0">최고층</span>` : '';
@@ -434,7 +433,10 @@ export default function MapView({
 
                               <div class="flex items-center justify-between gap-2 pt-0.5 border-t border-slate-50/60 dark:border-gray-700/40 w-full text-[10.5px] text-slate-400 dark:text-gray-500">
                                 <span>${dateDisplayHtml}</span>
-                                <span class="px-1.5 py-0 text-[9.5px] font-bold rounded border tracking-tight shrink-0 ${statusBadgeClass}">${ev.elvtrStts || '-'}</span>
+                                <div class="flex items-center gap-1 shrink-0 ml-auto">
+                                  ${kindBadgeHtml}
+                                  <span class="px-1.5 py-0 text-[9.5px] font-bold rounded border tracking-tight shrink-0 ${statusBadgeClass}">${ev.elvtrStts || '-'}</span>
+                                </div>
                               </div>
 
                             </div>
@@ -506,7 +508,6 @@ export default function MapView({
                 if (found) {
                   const foundMaxGround = found.buildingMaxGround || 0;
                   const foundMaxUnderground = found.buildingMaxUnderground || 0;
-                  // ★ 스코프 버그 완전 수리: 외부 루프의 group.elevators를 바라보도록 안전 캡슐화 완료
                   const isMultiElevator = group.elevators.length >= 2;
                   onMarkerClick({
                     ...found,
@@ -523,7 +524,6 @@ export default function MapView({
             }
           });
 
-          // ★ 펜딩 포커스 처리: overlay 생성 후 해당 overlay 열기
           if (pendingFocusRef.current && mapInstanceRef.current && isCurrent) {
             const focusAddr = pendingFocusRef.current;
             const targetIdx = geoGroups.findIndex(g => g.address === focusAddr);
@@ -532,7 +532,6 @@ export default function MapView({
               focusAddressRef.current = focusAddr;
               const targetGroup = geoGroups[targetIdx];
               const position = new kakao.maps.LatLng(targetGroup.lat, targetGroup.lng);
-              // 약간의 지연 후 panTo + overlay 열기
               setTimeout(() => {
                 if (mapInstanceRef.current && isCurrent) {
                   mapInstanceRef.current.panTo(position);
@@ -552,7 +551,7 @@ export default function MapView({
 
     renderMap();
     return () => { isCurrent = false; };
-  }, [geoGroupsKey, bookmarkedIds, viewedIds, closeAllOverlays, onMarkerClick, onMapReady, mapKey, onBookmarkChange, onShowBookmarkPicker]);
+  }, [geoGroupsKey, bookmarkedIds, viewedIds, closeAllOverlays, onMarkerClick, onMapReady, mapKey, onBookmarkChange, onShowBookmarkPicker, settings]);
 
   return (
     <div ref={wrapperRef} className={`w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-2 shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 rounded-none p-0 border-0 flex flex-col' : ''}`}>

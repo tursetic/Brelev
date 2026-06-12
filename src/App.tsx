@@ -580,8 +580,8 @@ export default function App() {
             </svg>
           </div>
           <div>
-            <h1 className="text-base font-bold text-gray-900 dark:text-gray-100">Brelev</h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500">승강기 정보 조회</p>
+            <h1 className="text-base font-bold text-gray-900 dark:text-gray-100">elNavi</h1>
+            <p className="text-xs text-gray-400 dark:text-gray-500">내 손 안에 전국을 - 승강기 정보 조회</p>
           </div>
         </div>
         <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -666,22 +666,25 @@ export default function App() {
       )}
 
       <main className="flex-1 flex flex-col overflow-y-auto">
-        {/* 건물 레이어 단독 전용 격리 탭 구역 새둥지 안착 */}
-        {searchTab === 'buildingLayer' && (
-          <div className="p-4 flex-1 flex flex-col">
-            <BuildingLayerMap
-              onLoadingStateChange={(state) => setLoading(state)}
-              onBuildingSelect={(elevatorsList, forceOpenModal) => {
-                if (elevatorsList.length > 0) {
-                  // 다 대수 여부 분기를 거쳐 정돈된 최종 타겟 1대를 상세모달창으로 안전하게 바인딩
-                  handleElevatorSelect(elevatorsList[0]);
-                }
-              }}
-            />
-          </div>
-        )}
+        {/* 🛡️ [Keep-Alive 장착] DOM 파괴를 차단하고 hidden 클래스로 감추어 지도 위치 영구 보존 및 북마크 연동 완료 */}
+        <div className={`p-4 flex-1 flex flex-col ${searchTab === 'mapSearch' ? '' : 'hidden'}`}>
+          <BuildingLayerMap
+            visible={searchTab === 'mapSearch'}
+            settings={settings}
+            bookmarkedIds={bookmarkedIds}
+            viewedIds={viewedIds}
+            onBookmarkChange={() => getBookmarkedElevatorNos().then(setBookmarkedIds).catch(() => {})}
+            onShowBookmarkPicker={(el) => setSelectedElevator(el)}
+            onLoadingStateChange={(state) => setLoading(state)}
+            onBuildingSelect={(elevatorsList) => {
+              if (elevatorsList.length > 0) {
+                handleElevatorSelect(elevatorsList[0]);
+              }
+            }}
+          />
+        </div>
 
-        {searchTab !== 'buildingLayer' && pageResults.length > 0 && totalPages > 1 && viewMode === 'list' && (
+        {searchTab !== 'mapSearch' && pageResults.length > 0 && totalPages > 1 && viewMode === 'list' && (
           <div className="px-4 pt-3 pb-1">
             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
           </div>
@@ -711,7 +714,7 @@ export default function App() {
           </div>
         )}
 
-        {hasVisitedMap && hasSearched && searchTab !== 'buildingLayer' && (
+        {hasVisitedMap && hasSearched && searchTab !== 'mapSearch' && (
           <div className={`p-4 ${viewMode === 'map' ? '' : 'hidden'}`}>
             <MapView
               geoGroups={geoGroups}
@@ -722,6 +725,7 @@ export default function App() {
               visible={viewMode === 'map'}
               bookmarkedIds={bookmarkedIds}
               viewedIds={viewedIds}
+              settings={settings} // <-- settings 제원 수입 바인딩
               onMapReady={() => {}}
               onBookmarkChange={() => getBookmarkedElevatorNos().then(setBookmarkedIds).catch(() => {})}
               onShowBookmarkPicker={(el) => setSelectedElevator(el)}

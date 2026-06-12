@@ -47,7 +47,7 @@ export interface InspectionRecord {
   node_id?: string;
 }
 
-export type SearchTab = 'elevatorNo' | 'address' | 'buildingLayer';
+export type SearchTab = 'elevatorNo' | 'address' | 'mapSearch';
 
 export interface SettingsFields {
   elvtrDivNm: boolean;

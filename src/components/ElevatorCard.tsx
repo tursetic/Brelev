@@ -38,228 +38,206 @@ function getModelColorClass(manufacturerName?: string): string {
   return 'text-[#8B4513] dark:text-[#EAA850]';
 }
 
-function SingleCard({ el, settings, onSelect, bookmarkedIds, viewedIds }: { el: ElevatorWithBadges; settings: SettingsFields; onSelect: (e: ElevatorWithBadges) => void; bookmarkedIds?: Set<string>; viewedIds?: Set<string> }) {
-  const shuttle = checkShuttleSection(el.shuttleSection);
-  const hasReplacement = el.frstInstallationDe && el.installationDe && el.frstInstallationDe !== el.installationDe;
-  const statusBadgeClass = getStatusBadgeClass(el.elvtrStts || '');
-  const isBookmarked = bookmarkedIds?.has(el.elevatorNo);
-  const isViewed = viewedIds?.has(el.elevatorNo);
+export default function ElevatorCard({
+  buildingName,
+  address,
+  elevators,
+  settings,
+  onSelect,
+  bookmarkedIds = new Set(),
+  viewedIds = new Set()
+}: Props) {
+  if (!elevators || elevators.length === 0) return null;
 
-  const shuttleBadgeClass = !shuttle.valid
-    ? 'bg-purple-50/40 text-purple-500 dark:text-purple-400 border-purple-100 dark:border-purple-900/30 font-bold text-[10.5px]'
-    : 'bg-slate-50/60 dark:bg-gray-800 text-slate-400 dark:text-gray-500 border-slate-100 dark:border-gray-700 font-normal text-[10.5px]';
+  const isMulti = elevators.length > 1;
 
-  const cardBgClass = isBookmarked
-    ? 'bg-yellow-50/40 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800/40'
-    : isViewed
-    ? 'bg-slate-50/30 dark:bg-slate-900/20 border-slate-200/50 dark:border-slate-800/60'
-    : 'bg-white dark:bg-gray-800 border-slate-200/60 dark:border-gray-700/60';
+  // 1) 단독 카드 레이아웃 브랜치 (elevators.length === 1)
+  if (!isMulti) {
+    const el = elevators[0];
+    const isBookmarked = bookmarkedIds.has(el.elevatorNo);
+    const isViewed = viewedIds.has(el.elevatorNo);
+    const shuttle = checkShuttleSection(el.shuttleSection);
+    const statusBadgeClass = getStatusBadgeClass(el.elvtrStts || '');
+    const modelColorClass = getModelColorClass(el.manufacturerName);
+    const hasReplacement = el.frstInstallationDe && el.installationDe && el.frstInstallationDe !== el.installationDe;
 
-  const opacityClass = isViewed && !isBookmarked ? 'opacity-75' : '';
-  const modelColorClass = getModelColorClass(el.manufacturerName);
+    const asignNo = (el.elvtrAsignNo || '').trim().replace(/호기$|호$/, '');
+    const displayAsign = asignNo ? `${asignNo}호기` : '승강기';
+    const displayAsignWithPlace = el.installationPlace 
+      ? `${displayAsign} (${el.installationPlace.trim()})` 
+      : displayAsign;
 
-  return (
-    <div
-      onClick={() => onSelect(el)}
-      className={`${cardBgClass} ${opacityClass} rounded-xl border px-3.5 py-2 cursor-pointer hover:shadow-sm transition-all group`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          <span className="font-semibold text-slate-800 dark:text-gray-100 text-[15.5px] tracking-tight truncate">{el.buldNm || '건물명 없음'}</span>
-          {!shuttle.valid && el.shuttleSection && (
-            <span className="px-1.5 py-0.25 bg-purple-50/80 dark:bg-purple-950/40 text-purple-500 dark:text-purple-400 border border-purple-100/70 text-[9.5px] font-bold rounded shrink-0">특이</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <BookmarkButton elevator={el} size={13} />
-          <ChevronRight size={15} className="text-slate-300 dark:text-gray-600 shrink-0 group-hover:text-blue-500 transition-colors" />
-        </div>
-      </div>
+    // 🎨 다크 모드 특이 운행 배지 고대비 보정 유지
+    const shuttleBadgeClass = !shuttle.valid
+      ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800/50 font-bold text-[9.5px]'
+      : 'bg-slate-50 dark:bg-gray-700/50 text-slate-600 dark:text-gray-300 border-slate-200 dark:border-gray-600 font-normal text-[9.5px]';
 
-      <p className="text-[11.5px] text-slate-400 dark:text-gray-500 mt-0.5 font-normal truncate">
-        {`${el.address1 || ''} ${el.address2 || ''}`.trim()}
-      </p>
+    // ✨ [디자인 개선] 이미 조회한 단독 카드는 은은한 실버-블루 보더 포인트와 정밀 투명도 밸런스로 복합 헤더와의 시각적 구분을 명확화 (다크 모드 희뿌연 배경 제거 완료)
+    const rowBgClass = isBookmarked
+      ? 'bg-yellow-100/20 dark:bg-yellow-800/10 border-yellow-500/40'
+      : isViewed
+      ? 'bg-white dark:bg-gray-800 border-l-4 border-l-slate-300 dark:border-l-gray-600 border-y-slate-200/60 border-r-slate-200/60 dark:border-y-gray-800 dark:border-r-gray-800 opacity-75'
+      : 'bg-white dark:bg-gray-800 border-slate-200/70 dark:border-gray-700/50';
 
-      <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[11.5px] font-normal text-slate-400 dark:text-gray-500">
-        <span className="px-1 py-0.25 bg-slate-50/50 dark:bg-gray-700/40 text-slate-500 dark:text-gray-400 rounded border border-slate-200/40 dark:border-gray-600/40 font-medium tracking-tight">{el.elevatorNo}</span>
-        {el.elvtrAsignNo && (
-          <span className="px-1 py-0.25 bg-slate-50/50 dark:bg-gray-700/40 text-slate-500 dark:text-gray-400 rounded border border-slate-200/40 dark:border-gray-600/40 font-medium truncate max-w-[200px]">
-            {el.elvtrAsignNo.trim().replace(/호기$|호$/, '')}호기{el.installationPlace ? ` (${el.installationPlace.trim()})` : ''}
-          </span>
-        )}
-      </div>
-
-      {(el.manufacturerName || el.elvtrModel || el.ratedSpeed || el.liveLoad) && (
-        <div className="mt-1.5 pt-1 border-t border-slate-100/70 dark:border-gray-700/50 space-y-0.5">
-          {(el.manufacturerName || el.elvtrModel) && (
-            <div className="flex items-center gap-1 min-w-0 text-[14.5px]">
-              {/* 유저 지정 규칙: 단독 카드 제조사명 고정 폭 135px 수평 동기화 */}
-              <span className="text-slate-800 dark:text-gray-200 font-black tracking-tight truncate max-w-[135px] inline-block shrink-0">{el.manufacturerName}</span>
-              {el.manufacturerName && el.elvtrModel && <span className="text-slate-200 dark:text-gray-700 text-xs shrink-0 font-normal">|</span>}
-              <span className={`${modelColorClass} font-black tracking-tight truncate flex-1`}>{el.elvtrModel}</span>
+    return (
+      // 🎯 [초밀착] 단독 카드 상하 외곽 박스 패딩 컴팩트 최소화 (py-2, px-2.5)
+      <div
+        onClick={() => onSelect(el)}
+        className={`border rounded-xl px-2.5 py-2 ${rowBgClass} hover:shadow-md transition-all cursor-pointer flex flex-col gap-0 relative group`}
+      >
+        {/* 상단 라인: 건물명 및 주소 */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[13.5px] font-black text-gray-900 dark:text-gray-100 truncate tracking-tight">{buildingName}</h3>
+            {/* 🎯 [초밀착] 건물명과 주소 사이 간격을 극도로 밀착 (mt-0.5) */}
+            <div className="text-[11px] text-slate-400 dark:text-gray-400 mt-0.5 truncate font-medium">
+              {address}
             </div>
-          )}
-          {(el.shuttleSection || el.ratedSpeed || el.liveLoad) && (
-            <div className="flex items-center gap-1.5 text-[11.5px] text-slate-400 dark:text-gray-500 font-medium min-w-0 flex-wrap">
-              {el.shuttleSection && <span className={`px-1 py-0.25 rounded text-[10px] border shrink-0 ${shuttleBadgeClass}`}>{el.shuttleSection} 운행</span>}
-              <span className="shrink-0">{formatRatedSpeed(el.ratedSpeed)}</span>
-              {el.ratedSpeed && el.liveLoad && <span className="text-slate-200 dark:text-gray-700 font-normal shrink-0">•</span>}
-              <span className="shrink-0">{el.liveLoad}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-3 mt-1.5 pt-1 border-t border-slate-100/70 dark:border-gray-700/50">
-        <div className="text-[11.5px] text-slate-400 dark:text-gray-500 font-normal">
-          {hasReplacement ? (
-            <span className="text-slate-700 dark:text-gray-300 font-black bg-slate-100/80 dark:bg-gray-700/40 px-1 py-0.25 rounded">교체 {formatDate(el.installationDe)}</span>
-          ) : el.installationDe ? (
-            <span>설치 {formatDate(el.installationDe)}</span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {settings.elvtrKindNm && el.elvtrKindNm && <span className="px-1 py-0.25 text-[10.5px] font-normal bg-slate-50/40 dark:bg-gray-700/40 border border-slate-200/40 dark:border-gray-600/30 text-slate-400 dark:text-gray-500 rounded">{el.elvtrKindNm}</span>}
-          {settings.elvtrStts && el.elvtrStts && <span className={`px-1.5 py-0.25 text-[10.5px] font-bold rounded border tracking-tight ${statusBadgeClass}`}>{el.elvtrStts}</span>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GroupCard({ buildingName, address, elevators, settings, onSelect, bookmarkedIds, viewedIds }: Props) {
-  const maxGround = elevators[0]?.buildingMaxGround || 0;
-  const maxUnderground = elevators[0]?.buildingMaxUnderground || 0;
-
-  const hasBookmarked = elevators.some((e) => bookmarkedIds?.has(e.elevatorNo));
-  const isAnyRowViewed = elevators.some((e) => viewedIds?.has(e.elevatorNo));
-
-  const cardBgClass = hasBookmarked
-    ? 'bg-yellow-50/30 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800/40 shadow-[0_1px_3px_rgba(0,0,0,0.01)]'
-    : 'bg-white dark:bg-gray-800 border-slate-200/70 dark:border-gray-700/60 shadow-[0_1px_3px_rgba(0,0,0,0.01)]';
-
-  const headerOpacityClass = isAnyRowViewed ? 'opacity-70' : '';
-  const cleanAddress = (address || '').replace(/·/g, ' ').replace(/\s+/g, ' ').trim();
-
-  return (
-    <div className={`${cardBgClass} rounded-xl border overflow-hidden hover:shadow-sm transition-all`}>
-      <div className={`px-3 py-1.5 bg-slate-50/50 dark:bg-gray-700/40 border-b border-slate-100 dark:border-gray-600/60 ${headerOpacityClass} transition-opacity`}>
-        <div className="flex flex-col gap-0.5 w-full">
-          <div className="flex items-center justify-between gap-3 w-full">
-            <span className="font-semibold text-slate-800 dark:text-gray-100 text-[15.5px] tracking-tight truncate flex-1">{buildingName || '건물명 없음'}</span>
-            <span className="shrink-0 px-1.5 py-0.25 bg-white/80 dark:bg-gray-600/60 border border-slate-200/40 dark:border-gray-600 text-slate-500 dark:text-gray-400 text-[10.5px] font-semibold rounded shadow-none">총 {elevators.length}대</span>
           </div>
-          
-          <div className="flex items-center gap-1.5 text-[11.5px] text-slate-400 dark:text-gray-500 font-normal w-full min-w-0">
-            {(maxGround > 0 || maxUnderground > 0) && (
-              <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
-                {maxGround > 0 && <span className="px-1 py-0.25 bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200/60 text-[9px] font-bold rounded">↑{maxGround}F</span>}
-                {maxUnderground > 0 && <span className="px-1 py-0.25 bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200/60 text-[9px] font-bold rounded">↓{maxUnderground}F</span>}
-              </div>
-            )}
-            <p className="truncate flex-1 font-normal text-slate-400 dark:text-gray-500">{cleanAddress}</p>
+          <div className="flex items-center gap-1 shrink-0 z-10" onClick={(e) => e.stopPropagation()}>
+            <BookmarkButton elevator={el} bookmarkedIds={bookmarkedIds} />
+          </div>
+        </div>
+
+        {/* 제원 영역: 🎯 [초밀착] 마진 조임 및 세로 간격 최소화 */}
+        <div className="mt-1 pt-1 border-t border-slate-100 dark:border-gray-700/40 flex flex-col gap-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap text-[14.5px]">
+            <span className="text-slate-900 dark:text-gray-100 font-black tracking-tight shrink-0">{el.manufacturerName || '제조사 미기재'}</span>
+            <span className="text-slate-200 dark:text-gray-700 text-xs font-normal shrink-0">|</span>
+            <span className={`${modelColorClass} font-black tracking-tight truncate flex-1`}>{el.elvtrModel || '모델명 미기재'}</span>
+          </div>
+
+          {/* 🎯 [초밀착] 제조업체 줄과 운행구간 줄 사이 간격 mt-0 완치 밀착 */}
+          <div className="flex items-center gap-1.5 text-[11px] font-bold flex-wrap mt-0">
+            <span className={`px-1.5 py-0.25 rounded border text-[9.5px] font-bold ${shuttleBadgeClass}`}>{el.shuttleSection || '전층'} 운행</span>
+            <span className="bg-slate-50 dark:bg-gray-700/60 text-slate-600 dark:text-gray-300 px-1.5 py-0.25 rounded font-medium">{formatRatedSpeed(el.ratedSpeed)}</span>
+            <span className="bg-slate-50 dark:bg-gray-700/60 text-slate-600 dark:text-gray-300 px-1.5 py-0.25 rounded font-medium">{el.liveLoad ? `${String(el.liveLoad).replace(/kg/gi, '').trim()} kg` : '-'}</span>
+            <span className="px-1.5 py-0.25 bg-slate-50/50 dark:bg-gray-800/40 text-slate-400 dark:text-gray-500 rounded text-[9px] border border-slate-200/30 dark:border-gray-700/30 font-normal shrink-0 tracking-tight ml-auto">{el.elevatorNo}</span>
+          </div>
+        </div>
+
+        {/* 하단선 및 배지 마감구역: 🎯 [초밀착] 상하 여백 압축 */}
+        <div className="flex items-center justify-between gap-2 pt-1 mt-1 border-t border-slate-100 dark:border-gray-700/40 text-[11px]">
+          <div className="text-[11.5px] text-slate-400 dark:text-gray-500 font-normal">
+            {hasReplacement ? <span className="text-slate-600 dark:text-gray-300 font-black bg-slate-100/80 dark:bg-gray-700/40 px-1 py-0.25 rounded">교체 {formatDate(el.installationDe)}</span> : el.installationDe ? <span>설치 {formatDate(el.installationDe)}</span> : null}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {settings.elvtrKindNm && el.elvtrKindNm && <span className="px-1 py-0.25 text-[10.5px] font-normal bg-slate-50/40 dark:bg-gray-700/40 border border-slate-200/40 dark:border-gray-600/30 text-slate-400 dark:text-gray-500 rounded">{el.elvtrKindNm}</span>}
+            {settings.elvtrStts && el.elvtrStts && <span className={`px-1.5 py-0.25 text-[10.5px] font-bold rounded border tracking-tight ${statusBadgeClass}`}>{el.elvtrStts}</span>}
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* ★ 해결 완료: 간섭을 일으키던 divide-y 클래스를 완전히 파괴하고 순수 flex 구조로 리디렉션 */}
-      <div className="flex flex-col">
+  // 2) 복합 카드 레이아웃 브랜치 (elevators.length > 1)
+  const isGroupBookmarked = elevators.some(e => bookmarkedIds.has(e.elevatorNo));
+  
+  // 🎯 [정품 로직 수술 복원] 원래 있던 1대 이상 기조회 여부 판별 연산 장치 완벽 부활
+  const isGroupViewed = elevators.some(e => viewedIds.has(e.elevatorNo));
+
+  // ✨ [디자인 개선] 라이트 모드에서 단독 모달 조회 상태와 겹쳐 혼동을 유발하던 배경색을 명확히 독립 명도로 격리 분리
+  const groupHeaderBg = isGroupBookmarked
+    ? 'bg-yellow-500/10 dark:bg-yellow-900/20 border-yellow-500/20'
+    : isGroupViewed
+    ? 'bg-slate-100 dark:bg-gray-800 border-l-4 border-l-slate-400 dark:border-l-gray-500'
+    : 'bg-slate-100 dark:bg-gray-800';
+
+  return (
+    // 🎯 [초밀착] 복합 카드 외곽 프레임 간격 최소 압축
+    <div className="border border-slate-200/60 dark:border-gray-700 rounded-xl overflow-hidden shadow-xs flex flex-col bg-white dark:bg-gray-900">
+      {/* 복합 카드 상단 헤더 */}
+      <div className={`px-2.5 py-1.5 border-b border-slate-200/60 dark:border-gray-700 flex items-start justify-between gap-2 ${groupHeaderBg}`}>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[13.5px] font-black text-gray-900 dark:text-gray-100 truncate tracking-tight">{buildingName}</h3>
+          {/* 🎯 [초밀착] 복합 카드 헤더 내 건물명-주소 간격 극대 밀착 (mt-0.5) */}
+          <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5 truncate font-medium">
+            {address}
+          </div>
+        </div>
+        
+        {/* 🎯 [정품 디자인 복원] 유저가 직접 만드신 정품 '총 X대 + 화살표' 우측 피드 배지 인터페이스 무결성 복구 */}
+        <div className="flex items-center gap-0.5 text-blue-600 dark:text-blue-400 shrink-0 font-bold text-[11px] mt-0.5">
+          <span>총 {elevators.length}대</span>
+          <ChevronRight size={14} />
+        </div>
+      </div>
+
+      {/* 내부 소속 승강기 리스트 패키징: 🎯 [초밀착] 목록 정렬 밀착 가속도 전개 */}
+      <div className="bg-white dark:bg-gray-900 p-0.5 space-y-0.5">
         {elevators.map((el, idx) => {
+          const isBookmarked = bookmarkedIds.has(el.elevatorNo);
+          const isViewed = viewedIds.has(el.elevatorNo);
           const shuttle = checkShuttleSection(el.shuttleSection);
-          const hasReplacement = el.frstInstallationDe && el.installationDe && el.frstInstallationDe !== el.installationDe;
           const statusBadgeClass = getStatusBadgeClass(el.elvtrStts || '');
-
-          const isTopGround = maxGround > 0 && (parseInt(el.divGroundFloorCnt, 10) || 0) === maxGround;
-          const isDeepUnderground = maxUnderground > 0 && (parseInt(el.divUndgrndFloorCnt, 10) || 0) === maxUnderground;
-          
-          const isBookmarked = bookmarkedIds?.has(el.elevatorNo);
-          const isViewed = viewedIds?.has(el.elevatorNo);
+          const modelColorClass = getModelColorClass(el.manufacturerName);
+          const hasReplacement = el.frstInstallationDe && el.installationDe && el.frstInstallationDe !== el.installationDe;
 
           const asignNo = (el.elvtrAsignNo || '').trim().replace(/호기$|호$/, '');
           const displayAsign = asignNo ? `${asignNo}호기` : `${idx + 1}호기`;
+          const displayAsignWithPlace = el.installationPlace 
+            ? `${displayAsign} (${el.installationPlace.trim()})` 
+            : displayAsign;
 
+          // 🎨 다크 모드 특이 운행 배지 고대비 보정 유지
           const shuttleBadgeClass = !shuttle.valid
-            ? 'bg-purple-50/40 text-purple-500 dark:text-purple-400 border-purple-100 dark:border-purple-900/30 font-bold text-[10.5px]'
-            : 'bg-slate-50 dark:bg-gray-700/50 text-slate-500 dark:text-gray-400 border-slate-200 dark:border-gray-600 font-normal text-[10.5px]';
+            ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800/50 font-bold text-[9.5px]'
+            : 'bg-slate-50 dark:bg-gray-700/50 text-slate-600 dark:text-gray-300 border-slate-200 dark:border-gray-600 font-normal text-[9.5px]';
 
-          // ★ 해결 완료: border-color 초기화 간섭을 파괴했으므로 이제 1호기부터 막차까지 완벽하게 동일 명도의 왼쪽 바가 균일하게 고정 출력됩니다!
-          const rowBgClass = isBookmarked
-            ? 'bg-yellow-100/20 dark:bg-yellow-800/10 border-l-4 border-l-yellow-500'
+          // ✨ [디자인 개선] 복합 리스트 내부에서도 이미 조회된 항목은 좌측 보더 인디케이터 포인트 및 투명도 최적화 처리 (다크 모드 희뿌연 배경 제거 완료)
+          const itemBgClass = isBookmarked
+            ? 'bg-yellow-100/10 dark:bg-yellow-800/5'
             : isViewed
-            ? 'bg-slate-50/30 dark:bg-slate-900/5 border-l-4 border-l-slate-200 dark:border-l-gray-600'
-            : 'bg-white dark:bg-gray-800 border-l-4 border-l-slate-200 dark:border-l-gray-700/60';
-            
-          const rowOpacityClass = isViewed && !isBookmarked ? 'opacity-55' : '';
-          const modelColorClass = getModelColorClass(el.manufacturerName);
-
-          // divide-y 대신 간섭 없는 명확한 개별 inline-top-border 주입 연산
-          const borderTopClass = idx > 0 ? 'border-t border-t-slate-100/60 dark:border-t-gray-700/60' : '';
+            ? 'bg-white dark:bg-gray-800 border-l-4 border-l-slate-300 dark:border-l-gray-600 opacity-75'
+            : 'bg-white dark:bg-gray-800';
 
           return (
-            <div 
-              key={`${el.elevatorNo}-${el.installationPlace}`} 
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest('button')) return;
-                onSelect(el);
-              }} 
-              className={`${rowBgClass} ${rowOpacityClass} ${borderTopClass} px-3 py-2 cursor-pointer hover:bg-slate-50/40 dark:hover:bg-gray-700/20 active:bg-slate-100/30 dark:active:bg-gray-600/20 transition-all flex flex-col space-y-0.5 group`}
+            // 🎯 [초밀착 완치] 목록 스크롤 가독성을 위해 개별 아이템 행 상하 여백 초밀착 패딩 압축 완료 (py-1.5, px-2)
+            <div
+              key={el.elevatorNo}
+              onClick={() => onSelect(el)}
+              className={`px-2 py-1.5 rounded-lg flex flex-col gap-0 border border-transparent hover:bg-slate-50/80 dark:hover:bg-gray-800/40 cursor-pointer transition-colors relative group ${itemBgClass}`}
             >
-              <div className="flex items-center justify-between gap-2 w-full">
-                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                  <span className="px-1 py-0.25 bg-slate-50 dark:bg-gray-700/60 text-slate-600 dark:text-gray-300 text-[10px] font-bold rounded border border-slate-200/40 dark:border-gray-600 shrink-0">{displayAsign}</span>
-                  <span className="text-[13px] font-bold text-slate-700 dark:text-gray-200 truncate max-w-[140px]">{el.installationPlace || '위치 미기재'}</span>
-                  <span className="px-1 py-0.25 bg-slate-50/50 dark:bg-gray-700/40 text-slate-400 dark:text-gray-500 rounded text-[10.5px] border border-slate-200/30 dark:border-gray-600/30 font-normal shrink-0 tracking-tight">{el.elevatorNo}</span>
-                  
-                  {isTopGround && <span className="bg-slate-50 dark:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200/60 text-[9px] font-bold rounded px-1 py-0.25 shadow-none shrink-0">최고층</span>}
-                  {isDeepUnderground && <span className="bg-gray-100/60 dark:bg-gray-700/30 text-gray-500 dark:text-gray-400 text-[8px] font-medium rounded px-0.5 py-0.25 shadow-none shrink-0">최저층</span>}
-                  {!shuttle.valid && el.shuttleSection && <span className="bg-purple-50/60 dark:bg-purple-950/10 text-purple-500 dark:text-purple-400 border border-purple-100/60 text-[9px] font-bold rounded px-1 py-0.25 shadow-none shrink-0">특이</span>}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                  <span className="px-1.5 py-0.25 bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 text-[9.5px] font-bold rounded border border-slate-200/40 dark:border-gray-600/40 shrink-0">{displayAsignWithPlace}</span>
+                  <span className="px-1.5 py-0.25 bg-slate-50/50 dark:bg-gray-800/40 text-slate-400 dark:text-gray-500 rounded text-[9px] border border-slate-200/30 dark:border-gray-700/30 font-normal shrink-0 tracking-tight">{el.elevatorNo}</span>
+                  {el.isTopGround && <span className="bg-slate-100 dark:bg-gray-800 text-slate-500 text-[8.5px] font-bold rounded px-1 shrink-0">최고층</span>}
+                  {el.isDeepUnderground && <span className="bg-slate-100 dark:bg-gray-800 text-slate-500 text-[8.5px] font-bold rounded px-1 shrink-0">최저층</span>}
                 </div>
-
-                <div className="shrink-0 flex items-center">
-                  <BookmarkButton elevator={el} size={11} />
+                <div className="flex items-center gap-1 shrink-0 z-10" onClick={(e) => e.stopPropagation()}>
+                  <BookmarkButton elevator={el} bookmarkedIds={bookmarkedIds} />
                 </div>
               </div>
 
-              <div className="space-y-0.5">
-                {(el.manufacturerName || el.elvtrModel) && (
-                  <div className="flex items-center gap-1.5 min-w-0 text-[14.5px]">
-                    {/* 유저 지정 규칙: 복합 카드 제조업체명 고정 폭 135px 완벽 동기화 */}
-                    <span className="text-slate-800 dark:text-gray-200 font-black tracking-tight truncate max-w-[135px] inline-block shrink-0">{el.manufacturerName}</span>
-                    {el.manufacturerName && el.elvtrModel && <span className="text-slate-200 dark:text-gray-700 text-xs shrink-0 font-normal">|</span>}
-                    <span className={`${modelColorClass} font-black tracking-tight truncate flex-1`}>{el.elvtrModel}</span>
-                  </div>
-                )}
-                {(el.shuttleSection || el.ratedSpeed || el.liveLoad) && (
-                  <div className="flex items-center gap-1.5 text-[11.5px] text-slate-400 dark:text-gray-500 font-medium min-w-0 flex-wrap">
-                    <span className={`px-1 py-0.25 rounded text-[10px] border shrink-0 ${shuttleBadgeClass}`}>{el.shuttleSection || '전층'} 운행</span>
-                    <span className="shrink-0">{el.ratedSpeed ? formatRatedSpeed(el.ratedSpeed) : '속도 미기재'}</span>
-                    {el.ratedSpeed && el.liveLoad && <span className="text-slate-200 dark:text-gray-700 font-normal shrink-0">•</span>}
-                    <span className="shrink-0">{el.liveLoad || '하중 미기재'}</span>
-                  </div>
-                )}
+              {/* 🎯 [초밀착] 제조업체 표기선 마진 조임 상하 밀착 */}
+              <div className="flex items-baseline gap-1.5 flex-wrap text-[14.5px] mt-0.5">
+                <span className="text-slate-900 dark:text-gray-100 font-black tracking-tight shrink-0">{el.manufacturerName || '제조사 미기재'}</span>
+                <span className="text-slate-200 dark:text-gray-700 text-xs font-normal shrink-0">|</span>
+                <span className={`${modelColorClass} font-black tracking-tight truncate flex-1`}>{el.elvtrModel || '모델명 미기재'}</span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50/60 dark:border-gray-700/40">
+              {/* 🎯 [초밀착] 제조업체 줄과 운행구간 줄 사이 간격 타이포그래피 밀착 처리 (mt-0) */}
+              <div className="flex items-center gap-1.5 text-[11px] font-bold flex-wrap mt-0">
+                <span className={`px-1.5 py-0.25 rounded border text-[9.5px] font-bold ${shuttleBadgeClass}`}>{el.shuttleSection || '전층'} 운행</span>
+                <span className="bg-slate-50 dark:bg-gray-700/60 text-slate-600 dark:text-gray-300 px-1.5 py-0.25 rounded font-medium">{formatRatedSpeed(el.ratedSpeed)}</span>
+                <span className="bg-slate-50 dark:bg-gray-700/60 text-slate-600 dark:text-gray-300 px-1.5 py-0.25 rounded font-medium">{el.liveLoad ? `${String(el.liveLoad).replace(/kg/gi, '').trim()} kg` : '-'}</span>
+              </div>
+
+              {/* 하단 설치일 경계선 마감 패딩 초밀착 */}
+              <div className="flex items-center justify-between gap-2 pt-0.5 mt-0.5 border-t border-slate-100 dark:border-gray-700/40 text-[11px]">
                 <div className="text-[11.5px] text-slate-400 dark:text-gray-500 font-normal">
-                  {hasReplacement ? <span className="text-slate-700 dark:text-gray-300 font-black bg-slate-100/80 dark:bg-gray-700/40 px-1 py-0.25 rounded">교체 {formatDate(el.installationDe)}</span> : el.installationDe ? <span>설치 {formatDate(el.installationDe)}</span> : null}
+                  {hasReplacement ? <span className="text-slate-600 dark:text-gray-300 font-black bg-slate-100/80 dark:bg-gray-700/40 px-1 py-0.25 rounded">교체 {formatDate(el.installationDe)}</span> : el.installationDe ? <span>설치 {formatDate(el.installationDe)}</span> : null}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {settings.elvtrKindNm && el.elvtrKindNm && <span className="px-1 py-0.25 text-[10.5px] font-normal bg-slate-50/40 dark:bg-gray-700/40 border border-slate-200/40 dark:border-gray-600/30 text-slate-400 dark:text-gray-500 rounded">{el.elvtrKindNm}</span>}
                   {settings.elvtrStts && el.elvtrStts && <span className={`px-1.5 py-0.25 text-[10.5px] font-bold rounded border tracking-tight ${statusBadgeClass}`}>{el.elvtrStts}</span>}
                 </div>
               </div>
-
             </div>
           );
         })}
       </div>
     </div>
   );
-}
-
-export default function ElevatorCard({ buildingName, address, elevators, settings, onSelect, bookmarkedIds, viewedIds }: Props) {
-  if (elevators.length === 1) {
-    return <SingleCard el={elevators[0]} settings={settings} onSelect={onSelect} bookmarkedIds={bookmarkedIds} viewedIds={viewedIds} />;
-  }
-  return <GroupCard buildingName={buildingName} address={address} elevators={elevators} settings={settings} onSelect={onSelect} bookmarkedIds={bookmarkedIds} viewedIds={viewedIds} />;
 }

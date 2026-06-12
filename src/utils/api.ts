@@ -269,25 +269,28 @@ export function convertWGS84ToEPSG3857(lng: number, lat: number): [number, numbe
   return [x, y];
 }
 
-export async function fetchEleBuildings(bounds: { xmin: number; ymin: number; xmax: number; ymax: number; }, signal?: AbortSignal) {
+export async function fetchEleBuildings(
+  bounds: { xmin: number; ymin: number; xmax: number; ymax: number; }, 
+  layerType: 'q' | 'limit' = 'q',
+  signal?: AbortSignal
+) {
   const p3857_min = convertWGS84ToEPSG3857(bounds.xmin, bounds.ymin);
   const p3857_max = convertWGS84ToEPSG3857(bounds.xmax, bounds.ymax);
 
-  // 📐 공학 정밀도 교정: 미터 좌표 뒤에 ,EPSG:3857 격자 식별 명칭을 명확하게 바인딩
   const bboxParam = `${p3857_min[0]},${p3857_min[1]},${p3857_max[0]},${p3857_max[1]},EPSG:3857`;
   const viewparamsParam = `xmin:${bounds.xmin};ymin:${bounds.ymin};xmax:${bounds.xmax};ymax:${bounds.ymax}`;
-
   const baseUrl = "/api/proxy";
   
-  // 🎯 [규격 전면 복원] 오타가 난 레이어명 정정 및 안정적인 1.0.0 표준 버전으로 롤백
+  const typeName = layerType === 'limit' ? 'koelsadp:building_limit' : 'koelsadp:building_q';
+
   const params = new URLSearchParams({
     SERVICE: 'WFS',
     VERSION: '1.0.0',
     REQUEST: 'GetFeature',
     OUTPUTFORMAT: 'application/json',
-    TYPENAME: 'koelsadp:building_q', // <-- koelsa:building에서 원본 명칭으로 정정
+    TYPENAME: typeName,
     BBOX: bboxParam,
-    VIEWPARAMS: viewparamsParam
+    VIEWPARAMS: viewparamsParam // 🎯 완치 가드: q와 limit 둘 다 SQL View 기반이므로 조건문 없이 무조건 주입합니다.
   });
 
   const url = `${baseUrl}?${params.toString()}`;

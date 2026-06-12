@@ -756,7 +756,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-base font-bold text-gray-900 dark:text-gray-100">elNavi</h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500">내 손 안에 전국을 - 승강기 정보 조회</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">내 손 안에 전국을 - 엘네비</p>
           </div>
         </div>
         <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">

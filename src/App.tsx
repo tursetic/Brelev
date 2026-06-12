@@ -18,6 +18,17 @@ import FilterSidebar from './components/FilterSidebar';
 
 const ROWS_PER_PAGE = 100;
 
+// ★ [비밀 문구 상수] 향후 다른 검색 탭/기능에서도 동일하게 사용. 한 곳에서 수정하면 전체 반영됨.
+export const SECRET_PHRASE = '서해철도선';
+const SECRET_FETCH_ROWS = 500;
+const SECRET_MAX_TOTAL = 5000;
+
+export interface MapState {
+  center: { lat: number; lng: number };
+  level: number;
+  openedOverlayAddress: string | null;
+}
+
 interface LastSearchParams {
   tab: SearchTab;
   elevatorNo?: string;
@@ -91,10 +102,25 @@ export default function App() {
   const [geocoding, setGeocoding] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const [focusAddress, setFocusAddress] = useState<string | undefined>(undefined);
+  const [restoreMode, setRestoreMode] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE);
+
+  // ★ [비밀 문구 검색 상태] session-scoped, totalPages보다 먼저 선언해야 함
+  const allResultsRef = useRef<ElevatorWithBadges[] | null>(null);
+  const isSecretSearchRef = useRef<boolean>(false);
+  const secretInputBlockedRef = useRef<boolean>(false);
+  const [secretInput, setSecretInput] = useState('');
+  const [secretLoading, setSecretLoading] = useState(false);
+
+  const totalPages = useMemo(() => {
+    // 비밀 검색 모드에서는 전체 allResults 기준
+    if (isSecretSearchRef.current && allResultsRef.current) {
+      return Math.ceil(allResultsRef.current.length / ROWS_PER_PAGE);
+    }
+    return Math.ceil(totalCount / ROWS_PER_PAGE);
+  }, [totalCount]);
   const [lastSearchParams, setLastSearchParams] = useState<LastSearchParams | null>(null);
 
   interface TabCache {
@@ -103,17 +129,33 @@ export default function App() {
     totalCount: number;
     lastSearchParams: LastSearchParams | null;
     hasSearched: boolean;
+    viewMode: 'list' | 'map';
+    hasVisitedMap: boolean;
+    mapState: MapState | null;
+    allResults: ElevatorWithBadges[] | null;
+    isSecretSearch: boolean;
+    geoGroups: GeoGroup[];
+    mapKey: number;
   }
   const tabCacheRef = useRef<Record<string, TabCache | null>>({});
+  const mapViewRef = useRef<{ getMapState: () => MapState | null; setMapState: (state: MapState) => void } | null>(null);
 
   const handleTabChange = useCallback((newTab: SearchTab) => {
     const currentTab = searchTab;
+    const currentMapState = viewMode === 'map' && mapViewRef.current ? mapViewRef.current.getMapState() : null;
     tabCacheRef.current[currentTab] = {
       pageResults,
       currentPage,
       totalCount,
       lastSearchParams,
       hasSearched,
+      viewMode,
+      hasVisitedMap,
+      mapState: currentMapState,
+      allResults: allResultsRef.current,
+      isSecretSearch: isSecretSearchRef.current,
+      geoGroups,
+      mapKey,
     };
 
     const cached = tabCacheRef.current[newTab];
@@ -123,6 +165,26 @@ export default function App() {
       setTotalCount(cached.totalCount);
       setLastSearchParams(cached.lastSearchParams);
       setHasSearched(cached.hasSearched);
+      setViewMode(cached.viewMode);
+      setHasVisitedMap(cached.hasVisitedMap);
+      allResultsRef.current = cached.allResults;
+      isSecretSearchRef.current = cached.isSecretSearch;
+      setGeoGroups(cached.geoGroups);
+      setMapKey(cached.mapKey);
+      setError('');
+      setSearchTab(newTab);
+      // Restore map state after a delay to allow map to initialize
+      if (cached.viewMode === 'map' && cached.mapState) {
+        setRestoreMode(true);
+        setTimeout(() => {
+          if (mapViewRef.current && cached.mapState) {
+            mapViewRef.current.setMapState(cached.mapState);
+            setRestoreMode(false);
+          }
+        }, 200);
+      } else {
+        setRestoreMode(false);
+      }
     } else {
       setPageResults([]);
       setCurrentPage(1);
@@ -130,11 +192,14 @@ export default function App() {
       setLastSearchParams(null);
       setHasSearched(false);
       setGeoGroups([]);
+      setViewMode('list');
+      setHasVisitedMap(false);
+      allResultsRef.current = null;
+      isSecretSearchRef.current = false;
+      setError('');
+      setSearchTab(newTab);
     }
-    setError('');
-    setViewMode('list');
-    setSearchTab(newTab);
-  }, [searchTab, pageResults, currentPage, totalCount, lastSearchParams, hasSearched]);
+  }, [searchTab, pageResults, currentPage, totalCount, lastSearchParams, hasSearched, viewMode, hasVisitedMap, geoGroups, mapKey]);
 
   const [selectedElevator, setSelectedElevator] = useState<ElevatorWithBadges | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -305,10 +370,29 @@ export default function App() {
     [enhancedPageResults, applyFilters]
   );
 
+  // 비밀 검색 모드에서는 목록에 페이지네이션 적용
+  const paginatedDisplayResults = useMemo(() => {
+    if (isSecretSearchRef.current && allResultsRef.current && viewMode === 'list') {
+      const start = (currentPage - 1) * ROWS_PER_PAGE;
+      const end = start + ROWS_PER_PAGE;
+      const rawResults = allResultsRef.current.slice(start, end);
+      // Apply filters to the slice
+      return applyFilters(rawResults.map(el => ({
+        ...el,
+        buildingMaxGround: el.buildingMaxGround || 0,
+        buildingMaxUnderground: el.buildingMaxUnderground || 0,
+      })));
+    }
+    return displayResults;
+  }, [displayResults, currentPage, viewMode, applyFilters]);
+
   const groupedBuildings = useMemo(() => {
     const groups: Record<string, { buildingName: string; address: string; elevators: ElevatorWithBadges[] }> = {};
 
-    displayResults.forEach((el) => {
+    // 목록 보기에는 페이지네이션 결과 사용, 지도 보기에는 전체 사용
+    const resultsToGroup = viewMode === 'list' ? paginatedDisplayResults : displayResults;
+
+    resultsToGroup.forEach((el) => {
       const key = `${el.buldNm || '건물명 없음'}_${el.address1 || ''}`;
       if (!groups[key]) {
         groups[key] = {
@@ -321,7 +405,7 @@ export default function App() {
     });
 
     return Object.values(groups);
-  }, [displayResults]);
+  }, [paginatedDisplayResults, displayResults, viewMode]);
 
   const unmappedBuildings = useMemo(() => {
     const mappedIds = new Set<string>();
@@ -377,6 +461,10 @@ export default function App() {
       const withBadges = assignBadges(sorted);
       setPageResults(withBadges);
       setTotalCount(total);
+      // Reset secret search state on normal search
+      allResultsRef.current = null;
+      isSecretSearchRef.current = false;
+      secretInputBlockedRef.current = false;
     } catch (err) {
       if (signal?.aborted) return;
       setError('비상호출 버튼을 누른 후 잠시 기다려 주십시오.');
@@ -387,6 +475,87 @@ export default function App() {
       }
     }
   }, []);
+
+  // ★ [비밀 문구 검색 핸들러] 엔터키 전용, 버튼 없음
+  const handleSecretInputKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    if (secretLoading) return;
+
+    const inputPhrase = secretInput.trim();
+
+    // 항상 입력창 초기화 (잘못된 문구여도 정상처럼 보이게)
+    setSecretInput('');
+
+    if (inputPhrase !== SECRET_PHRASE) {
+      // 잘못된 문구: 조용히 무시 (차단 표시 안 함, 입력창만 초기화)
+      return;
+    }
+
+    // 이미 비밀 검색이 실행된 경우 추가 실행 차단
+    if (secretInputBlockedRef.current) return;
+
+    // 비밀 문구가 맞으면 다중 페이지 검색 시작
+    setSecretLoading(true);
+    setError('');
+
+    try {
+      // 먼저 전체 개수 파악 (numOfRows=1로 최소 요청)
+      const firstResult = await searchByAddress({
+        sido: undefined,
+        sigungu: undefined,
+        buldNm: undefined,
+        pageNo: 1,
+        numOfRows: '1',
+      });
+
+      const totalCountForSecret = firstResult.totalCount;
+
+      if (totalCountForSecret > SECRET_MAX_TOTAL) {
+        setError('정원 초과입니다. 나중에 타신 분은 내려주십시오.');
+        setSecretLoading(false);
+        secretInputBlockedRef.current = true;
+        return;
+      }
+
+      const maxPage = Math.ceil(totalCountForSecret / SECRET_FETCH_ROWS);
+      const allItems: ElevatorType[] = [];
+
+      for (let page = 1; page <= maxPage; page++) {
+        const pageResult = await searchByAddress({
+          sido: undefined,
+          sigungu: undefined,
+          buldNm: undefined,
+          pageNo: page,
+          numOfRows: SECRET_FETCH_ROWS.toString(),
+        });
+        allItems.push(...pageResult.items);
+      }
+
+      const sorted = sortElevators(allItems);
+      const withBadges = assignBadges(sorted);
+
+      allResultsRef.current = withBadges;
+      isSecretSearchRef.current = true;
+      setPageResults(withBadges);
+      setTotalCount(totalCountForSecret);
+      setHasSearched(true);
+      setLastSearchParams({ tab: 'address' });
+      setCurrentPage(1);
+      setSelectedFilters({});
+      setHideEscalator(true);
+      setModelKeyword('');
+      setMinGroundFloor('');
+      setMinSpeed('');
+      // 검색 완료 후 목록 뷰로 전환
+      setViewMode('list');
+      secretInputBlockedRef.current = true;
+    } catch (err) {
+      console.error('[SecretSearch] Error:', err);
+      setError('검색 중 오류가 발생했습니다.');
+    } finally {
+      setSecretLoading(false);
+    }
+  }, [secretInput, secretLoading]);
 
   useEffect(() => {
     geocodeAbortRef.current?.abort();
@@ -525,6 +694,12 @@ export default function App() {
   }, [searchTab, elevatorNoQuery, sido, sigungu, building, modelKeyword, minGroundFloor, minSpeed, fetchPage]);
 
   const handlePageChange = useCallback((page: number) => {
+    // 비밀 검색 모드에서는 로컬 페이지네이션 사용
+    if (isSecretSearchRef.current && allResultsRef.current) {
+      setCurrentPage(page);
+      return;
+    }
+
     geocodeAbortRef.current?.abort();
     searchAbortRef.current?.abort();
     const controller = new AbortController();
@@ -717,6 +892,7 @@ export default function App() {
         {hasVisitedMap && hasSearched && searchTab !== 'mapSearch' && (
           <div className={`p-4 ${viewMode === 'map' ? '' : 'hidden'}`}>
             <MapView
+              ref={mapViewRef}
               geoGroups={geoGroups}
               geocoding={geocoding}
               mapKey={mapKey}
@@ -725,12 +901,25 @@ export default function App() {
               visible={viewMode === 'map'}
               bookmarkedIds={bookmarkedIds}
               viewedIds={viewedIds}
-              settings={settings} // <-- settings 제원 수입 바인딩
+              settings={settings}
               onMapReady={() => {}}
               onBookmarkChange={() => getBookmarkedElevatorNos().then(setBookmarkedIds).catch(() => {})}
               onShowBookmarkPicker={(el) => setSelectedElevator(el)}
               focusAddress={focusAddress}
+              restoreMode={restoreMode}
             />
+            {/* ★ [비밀 문구 입력창] 지도 바로 아래, 입력 버튼 없이 엔터키만 동작 */}
+            <div className="mt-2">
+              <input
+                type="text"
+                value={secretInput}
+                onChange={(e) => setSecretInput(e.target.value)}
+                onKeyDown={handleSecretInputKeyDown}
+                placeholder={secretLoading ? '검색 중...' : ' '}
+                disabled={secretLoading || secretInputBlockedRef.current}
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              />
+            </div>
             {viewMode === 'map' && unmappedBuildings.length > 0 && (
               <div className="mt-3">
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2 text-xs text-rose-600 dark:text-rose-400 font-medium">

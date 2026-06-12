@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { GeoGroup, ElevatorWithBadges, SettingsFields } from '../types';
 import { ensureKakaoReady } from '../utils/api';
 import { formatDate, formatRatedSpeed, checkShuttleSection } from '../utils/elevatorHelpers';
 import { Maximize, Minimize } from 'lucide-react';
 import { removeBookmark } from '../utils/bookmarks';
+import { MapState } from '../App';
 
 interface MapViewProps {
   geoGroups: GeoGroup[];
@@ -19,9 +20,15 @@ interface MapViewProps {
   onShowBookmarkPicker?: (elevator: ElevatorWithBadges) => void;
   focusAddress?: string;
   settings?: SettingsFields;
+  restoreMode?: boolean;
 }
 
-export default function MapView({
+export interface MapViewRef {
+  getMapState: () => MapState | null;
+  setMapState: (state: MapState) => void;
+}
+
+const MapView = forwardRef<MapViewRef, MapViewProps>(({
   geoGroups = [],
   geocoding,
   totalElevators,
@@ -35,7 +42,8 @@ export default function MapView({
   onShowBookmarkPicker,
   focusAddress,
   settings,
-}: MapViewProps) {
+  restoreMode = false,
+}, ref) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const overlaysRef = useRef<any[]>([]);
@@ -50,6 +58,33 @@ export default function MapView({
   const prevBookmarkedKeyRef = useRef<string>('');
   const prevViewedKeyRef = useRef<string>('');
   const prevMapKeyRef = useRef<number>(0);
+
+  // ★ [지도 상태 보존] 외부에서 getMapState/setMapState 호출 가능하도록 노출
+  useImperativeHandle(ref, () => ({
+    getMapState: (): MapState | null => {
+      if (!mapInstanceRef.current) return null;
+      const center = mapInstanceRef.current.getCenter();
+      return {
+        center: { lat: center.getLat(), lng: center.getLng() },
+        level: mapInstanceRef.current.getLevel(),
+        openedOverlayAddress: openedGroupRef.current?.address || null,
+      };
+    },
+    setMapState: (state: MapState) => {
+      if (!mapInstanceRef.current) return;
+      const kakao = (window as any).kakao;
+      mapInstanceRef.current.setLevel(state.level);
+      mapInstanceRef.current.setCenter(new kakao.maps.LatLng(state.center.lat, state.center.lng));
+      if (state.openedOverlayAddress) {
+        const groupIndex = geoGroups.findIndex(g => g.address === state.openedOverlayAddress);
+        if (groupIndex !== -1 && overlaysRef.current[groupIndex]) {
+          overlaysRef.current[groupIndex].setMap(mapInstanceRef.current);
+          openedOverlayRef.current = overlaysRef.current[groupIndex];
+          openedGroupRef.current = geoGroups[groupIndex];
+        }
+      }
+    },
+  }), [geoGroups]);
 
   const closeAllOverlays = useCallback(() => {
     overlaysRef.current.forEach(overlay => {
@@ -214,17 +249,26 @@ export default function MapView({
           mapInstanceRef.current.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
           mapInstanceRef.current.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
           if (onMapReady) onMapReady();
+          // Don't setBounds here - let external setMapState handle it if needed
         }
 
-        if (isNewMap && !hasSetBoundsRef.current) {
-          mapInstanceRef.current.setBounds(bounds);
+        if (isNewMap && !hasSetBoundsRef.current && !restoreMode) {
+          // Only set bounds if it's truly a fresh map with new search results
+          // Check if we need to set initial bounds (no external state restoration)
+          setTimeout(() => {
+            if (mapInstanceRef.current && isCurrent && !mapKeyChanged) {
+              mapInstanceRef.current.relayout();
+              mapInstanceRef.current.setBounds(bounds);
+              hasSetBoundsRef.current = true;
+            }
+          }, 150);
+        } else if (!isNewMap && shouldRedrawMarkers && geoGroupsChanged && !restoreMode) {
+          // Existing map with new data - update bounds
           setTimeout(() => {
             if (mapInstanceRef.current && isCurrent) {
               mapInstanceRef.current.relayout();
-              mapInstanceRef.current.setBounds(bounds);
             }
-          }, 150);
-          hasSetBoundsRef.current = true;
+          }, 50);
         }
 
         if (shouldRedrawMarkers) {
@@ -571,4 +615,6 @@ export default function MapView({
       )}
     </div>
   );
-}
+});
+
+export default MapView;

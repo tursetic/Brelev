@@ -432,11 +432,11 @@ export default function SettingsMenu({ settings, onChange, onClose, onHistorySel
           </div>
 
           {/* Bookmarks */}
-          <div
-            className="border-t border-gray-100 dark:border-gray-800 pt-4 cursor-pointer"
-            onClick={() => toggleAccordion('bookmarks')}
-          >
-            <div className="flex items-center justify-between w-full mb-3">
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div
+              className="flex items-center justify-between w-full mb-3 cursor-pointer"
+              onClick={() => toggleAccordion('bookmarks')}
+            >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Bookmark size={16} className="text-yellow-500 shrink-0" fill="currentColor" />
                 <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">북마크</h4>
@@ -641,7 +641,7 @@ export default function SettingsMenu({ settings, onChange, onClose, onHistorySel
                     })}
 
                     {/* New folder input - placed after folder list */}
-                    <div className="flex gap-1.5 pt-2 border-t border-gray-100 dark:border-gray-700 mt-2">
+                    <div className="flex gap-1.5 pt-2 mt-2">
                       <input
                         type="text"
                         value={newFolderName}

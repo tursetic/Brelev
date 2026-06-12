@@ -98,16 +98,18 @@ export async function searchByAddress(params: {
   sigungu?: string;
   buldNm?: string;
   pageNo?: number;
+  numOfRows?: string;
   signal?: AbortSignal;
 }): Promise<{ items: Elevator[], totalCount: number }> {
   const pageNo = params.pageNo ?? 1;
-  const cacheKey = `addr:${params.sido || ''}:${params.sigungu || ''}:${params.buldNm || ''}:${pageNo}`;
+  const numOfRows = params.numOfRows || '100';
+  const cacheKey = `addr:${params.sido || ''}:${params.sigungu || ''}:${params.buldNm || ''}:${pageNo}:${numOfRows}`;
   const cached = getCached(searchCache, cacheKey);
   if (cached) return cached;
 
   const query = new URLSearchParams({
     serviceKey: SERVICE_KEY,
-    numOfRows: '100',
+    numOfRows,
     pageNo: pageNo.toString(),
   });
   if (params.sido) query.set('sido', params.sido);
